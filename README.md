@@ -57,7 +57,7 @@ AI-Driven-Fraud-Analytics/
 ## How to Train
 `python -m src.train` will:
 - simulate transactions with embedded fraud behavior,
-- train Logistic Regression, Random Forest, XGBoost (or Gradient Boosting fallback), and Isolation Forest benchmark,
+- train Logistic Regression, Random Forest, Gradient Boosting (and XGBoost only if available), and Isolation Forest benchmark,
 - tune threshold for F1,
 - evaluate fraud metrics (precision/recall/F1/ROC-AUC/PR-AUC/FPR/capture@top5%),
 - persist champion model and metadata in `models/`.
@@ -95,7 +95,8 @@ The monitoring page includes:
 
 ## Deployment Notes
 - Paths are relative and deployment-friendly.
-- If model artifacts are missing, `app.py` auto-runs the training pipeline.
+- If model artifacts are missing, `app.py` attempts training and gracefully falls back to deterministic rules-based scoring if runtime dependencies are constrained.
+- XGBoost and SHAP are optional enhancements; the app runs without them.
 
 ## Sample Screenshot Placeholders (to capture after running)
 - `docs/screenshots/home.png`: Home overview and KPI sidebar.
