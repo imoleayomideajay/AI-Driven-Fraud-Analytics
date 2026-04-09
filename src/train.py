@@ -128,7 +128,14 @@ def train_and_select_champion(df: pd.DataFrame) -> Tuple[Pipeline, TrainingArtif
     iso_metrics["capture_rate_top_5pct"] = capture_rate_at_top_n(y_test.values, iso_prob, 0.05)
     metrics_store["isolation_forest"] = iso_metrics
 
-    champion_name = max(metrics_store, key=lambda m: (metrics_store[m]["pr_auc"], metrics_store[m]["recall"]))
+    # Keep Isolation Forest as a benchmark only. It does not provide a calibrated
+    # `predict_proba` interface and therefore cannot be used as the production
+    # champion pipeline consumed by downstream scoring code.
+    supervised_candidates = list(fitted_pipelines.keys())
+    champion_name = max(
+        supervised_candidates,
+        key=lambda m: (metrics_store[m]["pr_auc"], metrics_store[m]["recall"]),
+    )
     champion_threshold = metrics_store[champion_name]["threshold"]
     champion_pipeline = fitted_pipelines[champion_name]
 
