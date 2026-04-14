@@ -57,31 +57,6 @@ def tune_threshold_for_f1(y_true: np.ndarray, y_prob: np.ndarray) -> Tuple[float
     return float(thresholds[idx]), float(scores[idx])
 
 
-def tune_threshold_with_precision_floor(
-    y_true: np.ndarray,
-    y_prob: np.ndarray,
-    min_precision: float = 0.35,
-) -> Tuple[float, Dict[str, float]]:
-    """Choose highest recall threshold that meets minimum precision; fallback to max F1 threshold."""
-    thresholds = np.linspace(0.05, 0.95, 91)
-    candidates = []
-    for t in thresholds:
-        pred = (y_prob >= t).astype(int)
-        p = precision_score(y_true, pred, zero_division=0)
-        r = recall_score(y_true, pred, zero_division=0)
-        f1 = f1_score(y_true, pred, zero_division=0)
-        candidates.append((t, p, r, f1))
-
-    valid = [row for row in candidates if row[1] >= min_precision]
-    if valid:
-        best = max(valid, key=lambda row: (row[2], row[3]))
-    else:
-        best = max(candidates, key=lambda row: row[3])
-
-    t, p, r, f1 = best
-    return float(t), {"precision": float(p), "recall": float(r), "f1": float(f1)}
-
-
 def summarize_cv_results(cv_scores: dict) -> pd.DataFrame:
     """Convert CV score dict to tidy dataframe."""
     rows = []
