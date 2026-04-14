@@ -17,13 +17,12 @@ from pages.model_performance import render_model_performance
 from pages.monitoring import render_monitoring
 from src.data_simulation import SimulationConfig, generate_synthetic_transactions, save_dataset
 from src.predict import load_model_artifacts
+from src.train import run_training
 from src.utils import DATA_DIR, ensure_directories
 
-logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 
-@st.cache_data(show_spinner=False)
 def _load_or_generate_data() -> pd.DataFrame:
     data_path = DATA_DIR / "synthetic_transactions.csv"
     if data_path.exists():
@@ -60,16 +59,6 @@ def main() -> None:
     st.set_page_config(page_title="Fraud Detection Dashboard", layout="wide", page_icon="🏦")
     ensure_directories()
 
-    st.markdown(
-        """
-        <style>
-        .stApp {background: linear-gradient(180deg, #f8fbff 0%, #eef4ff 100%);}
-        [data-testid="stMetricValue"] {font-size: 1.2rem;}
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
     st.sidebar.title("Navigation")
     page = st.sidebar.radio(
         "Go to",
@@ -88,14 +77,8 @@ def main() -> None:
     model, metadata = _ensure_model_ready()
     threshold = float(metadata.get("champion_threshold", 0.5))
 
-    if metadata.get("champion_model") == "rules_fallback":
-        st.warning(
-            "ML artifacts were unavailable in this session. The app is using a deterministic fraud-rules fallback for scoring."
-        )
-
     st.sidebar.markdown("---")
-    if "label_fraud" in data.columns:
-        st.sidebar.metric("Train Fraud Rate", f"{data['label_fraud'].mean():.2%}")
+    st.sidebar.metric("Train Fraud Rate", f"{data['label_fraud'].mean():.2%}")
     st.sidebar.metric("Champion", metadata.get("champion_model", "N/A"))
 
     if page == "Home":
@@ -109,10 +92,7 @@ def main() -> None:
     elif page == "Batch Scoring":
         render_batch_scoring(model, threshold)
     elif page == "Explainability":
-        if model is None:
-            st.info("Explainability is unavailable in rules fallback mode. Train/load ML artifacts to enable this page.")
-        else:
-            render_explainability(model, data)
+        render_explainability(model, data)
     elif page == "Monitoring":
         render_monitoring(data, model, threshold)
 

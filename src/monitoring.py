@@ -6,9 +6,6 @@ import numpy as np
 import pandas as pd
 
 
-PSI_COLUMNS = ["feature", "psi", "severity"]
-
-
 def population_stability_index(expected: pd.Series, actual: pd.Series, bins: int = 10) -> float:
     """Calculate PSI for a numeric feature."""
     expected = expected.dropna().astype(float)
@@ -48,8 +45,4 @@ def psi_summary(train_df: pd.DataFrame, new_df: pd.DataFrame, columns: list[str]
         else:
             severity = "high"
         rows.append({"feature": col, "psi": psi, "severity": severity})
-
-    if not rows:
-        return pd.DataFrame(columns=PSI_COLUMNS)
-
-    return pd.DataFrame(rows, columns=PSI_COLUMNS).sort_values("psi", ascending=False)
+    return pd.DataFrame(rows).sort_values("psi", ascending=False)
