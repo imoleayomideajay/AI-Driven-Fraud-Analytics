@@ -13,7 +13,7 @@ This project is an end-to-end fraud detection system for a digital bank / fintec
 ```text
 AI-Driven-Fraud-Analytics/
 ├── app.py
-├── ui_pages/
+├── pages/
 │   ├── home.py
 │   ├── data_exploration.py
 │   ├── model_performance.py
@@ -63,8 +63,6 @@ AI-Driven-Fraud-Analytics/
 - persist champion model and metadata in `models/`.
 
 ## Streamlit Sections
-Single top navigation bar controls all sections.
-
 1. **Home / Overview**
 2. **Data Exploration**
 3. **Model Performance**
