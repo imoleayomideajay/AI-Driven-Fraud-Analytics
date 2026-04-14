@@ -69,7 +69,7 @@ AI-Driven-Fraud-Analytics/
 4. **Live Scoring** (single transaction)
 5. **Batch Scoring** (CSV upload + download)
 6. **Explainability** (global feature importance)
-7. **Monitoring** (fraud rate, score distribution, drift check, alerts)
+7. **Monitoring** (fraud rate, score distribution, mean-shift drift, PSI stability index, alerts)
 
 ## Fraud Scenarios the App Detects
 - High-velocity bursts (many transactions in 24h + high velocity score).
@@ -85,6 +85,7 @@ The monitoring page includes:
 - fraud score distribution,
 - simple drift check comparing training vs uploaded batch means,
 - warning when mean feature shift exceeds a 25% threshold.
+- PSI-based stability classification (`stable`, `moderate`, `high`) for retraining governance.
 
 ## Deployment on Streamlit Community Cloud
 1. Push repository to GitHub.

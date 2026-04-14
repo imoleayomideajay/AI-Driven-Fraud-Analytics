@@ -32,12 +32,27 @@ def _load_or_generate_data() -> pd.DataFrame:
     return df
 
 
-def _ensure_model_ready() -> tuple[object, dict]:
+@st.cache_resource(show_spinner=False)
+def _ensure_model_ready() -> tuple[object | None, dict]:
     model_path = Path("models/champion_model.joblib")
     metadata_path = Path("models/training_metadata.json")
-    if not (model_path.exists() and metadata_path.exists()):
-        run_training()
-    return load_model_artifacts()
+
+    if model_path.exists() and metadata_path.exists():
+        return load_model_artifacts()
+
+    try:
+        from src.train import run_training
+
+        run_training(n_rows=25000)
+        return load_model_artifacts()
+    except Exception as exc:
+        logger.exception("Model training/loading failed: %s", exc)
+        return None, {
+            "champion_model": "rules_fallback",
+            "champion_threshold": 0.5,
+            "metrics": {},
+            "error": str(exc),
+        }
 
 
 def main() -> None:
