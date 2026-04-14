@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Any, Dict, Tuple
 
 import joblib
-import numpy as np
 import pandas as pd
 from sklearn.ensemble import GradientBoostingClassifier, IsolationForest, RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
@@ -16,7 +15,13 @@ from sklearn.model_selection import StratifiedKFold, cross_validate, train_test_
 from sklearn.pipeline import Pipeline
 
 from src.data_simulation import SimulationConfig, generate_synthetic_transactions, save_dataset
-from src.evaluate import capture_rate_at_top_n, compute_metrics, summarize_cv_results, tune_threshold_for_f1
+from src.evaluate import (
+    capture_rate_at_top_n,
+    compute_metrics,
+    summarize_cv_results,
+    tune_threshold_for_f1,
+    tune_threshold_with_precision_floor,
+)
 from src.features import add_derived_features
 from src.preprocess import build_preprocessor, split_features_target
 from src.utils import MODELS_DIR, OUTPUTS_DIR, RANDOM_SEED, ensure_directories, save_json, setup_logging

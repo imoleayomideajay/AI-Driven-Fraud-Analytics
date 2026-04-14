@@ -74,7 +74,17 @@ def generate_synthetic_transactions(config: SimulationConfig = SimulationConfig(
             "failed_login_count_24h": np.clip(rng.poisson(0.35, n), 0, 20),
             "beneficiary_age_days": np.clip(rng.gamma(3.0, 120, n).astype(int), 0, 3000),
             "velocity_score": np.clip(rng.normal(0.28, 0.16, n), 0, 1),
-            "prior_fraud_flag": rng.binomial(1, 0.07, n),
+            "prior_fraud_flag": rng.binomial(1, 0.07, n),            "transaction_count_30m": np.clip(rng.poisson(0.8, n), 0, 20),
+            "same_amount_withdrawals_day": np.clip(rng.poisson(0.5, n), 0, 12),
+            "dormant_days": np.clip(rng.gamma(1.5, 40, n).astype(int), 0, 1200),
+            "pii_change_24h": rng.binomial(1, 0.02, n),
+            "td_terminated_early": rng.binomial(1, 0.01, n),
+            "third_party_beneficiary_flag": rng.binomial(1, 0.08, n),
+            "beneficiary_count_24h": np.clip(rng.poisson(1.2, n), 1, 25),
+            "phone_change_24h": rng.binomial(1, 0.01, n),
+            "mobile_setup_age_days": np.clip(rng.gamma(2.0, 80, n).astype(int), 0, 2000),
+            "inflow_24h": np.clip(rng.lognormal(mean=4.4, sigma=1.0, size=n), 0, 150000),
+            "outflow_1h": np.clip(rng.lognormal(mean=3.8, sigma=1.1, size=n), 0, 100000),
         }
     )
 
@@ -105,7 +115,16 @@ def generate_synthetic_transactions(config: SimulationConfig = SimulationConfig(
         + 0.45 * df["prior_fraud_flag"]
         + 0.8 * np.log1p(amount_ratio)
         + 0.55 * type_risk
-        + 0.35 * merchant_risk
+        + 0.55 * (df["transaction_count_30m"] >= 3).astype(int)
+        + 0.70 * (df["same_amount_withdrawals_day"] >= 3).astype(int)
+        + 0.65 * ((df["dormant_days"] >= 180) & (df["transaction_type"].isin(["cash_withdrawal", "bank_transfer"]))).astype(int)
+        + 0.80 * ((df["pii_change_24h"] == 1) & (df["transaction_type"].isin(["cash_withdrawal", "bank_transfer", "wallet_transfer"]))).astype(int)
+        + 0.95 * ((df["td_terminated_early"] == 1) & (df["third_party_beneficiary_flag"] == 1)).astype(int)
+        + 0.75 * ((df["phone_change_24h"] == 1) & (df["mobile_setup_age_days"] <= 3) & (df["channel"] == "mobile_app")).astype(int)
+        + 0.60 * ((df["account_age_days"] <= 30) & (df["transaction_count_24h"] >= 5)).astype(int)
+        + 0.70 * ((df["mobile_setup_age_days"] <= 7) & (df["transaction_count_24h"] >= 5)).astype(int)
+        + 0.90 * ((df["inflow_24h"] >= 5000) & (df["outflow_1h"] >= 0.7 * df["inflow_24h"]) & (df["beneficiary_count_24h"] >= 3)).astype(int)
+        + 0.65 * ((df["geo_distance_from_home"] >= 700) | ((df["geo_distance_from_home"] >= 400) & (df["ip_risk_score"] >= 70))).astype(int)
     )
 
     calibrated_shift = np.log(config.fraud_base_rate / (1 - config.fraud_base_rate)) - np.mean(linear_risk)

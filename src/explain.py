@@ -9,7 +9,16 @@ import numpy as np
 import pandas as pd
 from sklearn.pipeline import Pipeline
 
+from src.features import add_derived_features
+
 logger = logging.getLogger(__name__)
+
+
+def _prepare_explainability_frame(df: pd.DataFrame) -> pd.DataFrame:
+    """Prepare input frame so it matches model training feature schema."""
+    feat = add_derived_features(df)
+    drop_cols = [c for c in ["label_fraud", "transaction_id", "customer_id", "timestamp"] if c in feat.columns]
+    return feat.drop(columns=drop_cols)
 
 
 def global_feature_importance(pipeline: Pipeline, X_sample: pd.DataFrame) -> pd.DataFrame:
@@ -17,7 +26,8 @@ def global_feature_importance(pipeline: Pipeline, X_sample: pd.DataFrame) -> pd.
     preprocessor = pipeline.named_steps["preprocessor"]
     model = pipeline.named_steps["model"]
 
-    X_t = preprocessor.transform(X_sample)
+    prepared = _prepare_explainability_frame(X_sample)
+    X_t = preprocessor.transform(prepared)
     feature_names = preprocessor.get_feature_names_out()
 
     if hasattr(model, "feature_importances_"):
@@ -25,7 +35,8 @@ def global_feature_importance(pipeline: Pipeline, X_sample: pd.DataFrame) -> pd.
     elif hasattr(model, "coef_"):
         importance = np.abs(model.coef_[0])
     else:
-        importance = np.std(X_t, axis=0).A1 if hasattr(X_t, "A1") else np.std(X_t, axis=0)
+        dense = X_t.toarray() if hasattr(X_t, "toarray") else np.asarray(X_t)
+        importance = np.std(dense, axis=0)
 
     out = pd.DataFrame({"feature": feature_names, "importance": importance})
     return out.sort_values("importance", ascending=False)
@@ -38,7 +49,8 @@ def shap_values_if_available(pipeline: Pipeline, X_sample: pd.DataFrame) -> Dict
 
         preprocessor = pipeline.named_steps["preprocessor"]
         model = pipeline.named_steps["model"]
-        transformed = preprocessor.transform(X_sample)
+        prepared = _prepare_explainability_frame(X_sample)
+        transformed = preprocessor.transform(prepared)
         explainer = shap.Explainer(model, transformed)
         shap_values = explainer(transformed)
         return {"available": True, "values": shap_values}
