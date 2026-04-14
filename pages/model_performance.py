@@ -9,7 +9,6 @@ def render_model_performance(metadata: dict) -> None:
     st.header("Model Performance")
     st.subheader(f"Champion Model: {metadata.get('champion_model', 'N/A')}")
     st.write(f"Decision threshold: **{metadata.get('champion_threshold', 0.5):.2f}**")
-    st.caption("Threshold policy: maximize recall under a minimum precision floor for operationally efficient alerting.")
 
     metrics_rows = []
     for model_name, values in metadata.get("metrics", {}).items():
@@ -28,7 +27,3 @@ def render_model_performance(metadata: dict) -> None:
             title="Model Metric Comparison",
         )
         st.plotly_chart(fig, use_container_width=True)
-
-        heat_df = metrics_df.set_index("model")[["precision", "recall", "f1", "roc_auc", "pr_auc"]]
-        heat = px.imshow(heat_df, color_continuous_scale="Blues", aspect="auto", title="Metric Heatmap")
-        st.plotly_chart(heat, use_container_width=True)
