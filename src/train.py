@@ -11,7 +11,6 @@ import joblib
 import pandas as pd
 from sklearn.ensemble import GradientBoostingClassifier, IsolationForest, RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import average_precision_score, make_scorer, precision_score, recall_score, f1_score, roc_auc_score
 from sklearn.model_selection import StratifiedKFold, cross_validate, train_test_split
 from sklearn.pipeline import Pipeline
 
@@ -60,7 +59,7 @@ def _get_boosting_model() -> Any:
 
 def _model_candidates() -> Dict[str, Any]:
     return {
-        "logistic_regression": LogisticRegression(max_iter=500, class_weight="balanced"),
+        "logistic_regression": LogisticRegression(max_iter=500, class_weight="balanced", n_jobs=None),
         "random_forest": RandomForestClassifier(
             n_estimators=280,
             max_depth=14,
@@ -82,15 +81,16 @@ def train_and_select_champion(df: pd.DataFrame) -> Tuple[Pipeline, TrainingArtif
         X, y, test_size=0.25, stratify=y, random_state=RANDOM_SEED
     )
 
+    preprocessor = build_preprocessor()
     metrics_store: Dict[str, Dict[str, float]] = {}
     cv_store: Dict[str, Dict[str, float]] = {}
     fitted_pipelines: Dict[str, Pipeline] = {}
 
     for name, model in _model_candidates().items():
-        pipeline = Pipeline(steps=[("preprocessor", build_preprocessor()), ("model", model)])
+        pipeline = Pipeline(steps=[("preprocessor", preprocessor), ("model", model)])
         pipeline.fit(X_train, y_train)
         prob = pipeline.predict_proba(X_test)[:, 1]
-        threshold, _ = tune_threshold_with_precision_floor(y_test.values, prob, min_precision=0.35)
+        threshold, _ = tune_threshold_for_f1(y_test.values, prob)
         pred = (prob >= threshold).astype(int)
 
         model_metrics = compute_metrics(y_test.values, pred, prob)
@@ -103,22 +103,17 @@ def train_and_select_champion(df: pd.DataFrame) -> Tuple[Pipeline, TrainingArtif
             X_train,
             y_train,
             cv=StratifiedKFold(n_splits=4, shuffle=True, random_state=RANDOM_SEED),
-            scoring={
-                "precision": make_scorer(precision_score, zero_division=0),
-                "recall": make_scorer(recall_score, zero_division=0),
-                "f1": make_scorer(f1_score, zero_division=0),
-                "roc_auc": make_scorer(roc_auc_score, response_method="predict_proba"),
-                "average_precision": make_scorer(average_precision_score, response_method="predict_proba"),
-            },
+            scoring=["precision", "recall", "f1", "roc_auc", "average_precision"],
             n_jobs=-1,
         )
         cv_summary_df = summarize_cv_results({k: v for k, v in cv.items() if k.startswith("test_")})
-        cv_store[name] = {row["metric"]: row["mean"] for _, row in cv_summary_df.iterrows()}
+        cv_store[name] = {
+            row["metric"]: row["mean"] for _, row in cv_summary_df.iterrows()
+        }
 
         fitted_pipelines[name] = pipeline
         logger.info("Model=%s metrics=%s", name, model_metrics)
 
-    # Isolation Forest benchmark only (not champion candidate because it is unsupervised and has no calibrated proba).
     iso_preprocessor = build_preprocessor()
     X_train_prep = iso_preprocessor.fit_transform(X_train)
     X_test_prep = iso_preprocessor.transform(X_test)
@@ -136,10 +131,16 @@ def train_and_select_champion(df: pd.DataFrame) -> Tuple[Pipeline, TrainingArtif
     iso_metrics = compute_metrics(y_test.values, iso_pred, iso_prob)
     iso_metrics["threshold"] = iso_threshold
     iso_metrics["capture_rate_top_5pct"] = capture_rate_at_top_n(y_test.values, iso_prob, 0.05)
-    metrics_store["isolation_forest_benchmark"] = iso_metrics
+    metrics_store["isolation_forest"] = iso_metrics
 
-    supervised_names = list(fitted_pipelines.keys())
-    champion_name = max(supervised_names, key=lambda m: (metrics_store[m]["pr_auc"], metrics_store[m]["recall"]))
+    # Keep Isolation Forest as a benchmark only. It does not provide a calibrated
+    # `predict_proba` interface and therefore cannot be used as the production
+    # champion pipeline consumed by downstream scoring code.
+    supervised_candidates = list(fitted_pipelines.keys())
+    champion_name = max(
+        supervised_candidates,
+        key=lambda m: (metrics_store[m]["pr_auc"], metrics_store[m]["recall"]),
+    )
     champion_threshold = metrics_store[champion_name]["threshold"]
     champion_pipeline = fitted_pipelines[champion_name]
 
@@ -181,11 +182,11 @@ def persist_training_outputs(
     scored_test.to_csv(outputs_dir / "test_scored.csv", index=False)
 
 
-def run_training(n_rows: int = 50_000) -> None:
+def run_training() -> None:
     """Generate data, train models, and save artifacts."""
     setup_logging()
     ensure_directories()
-    df = generate_synthetic_transactions(SimulationConfig(n_rows=n_rows))
+    df = generate_synthetic_transactions(SimulationConfig())
     save_dataset(df)
     champion_pipeline, artifacts, scored = train_and_select_champion(df)
     persist_training_outputs(champion_pipeline, artifacts, scored)
